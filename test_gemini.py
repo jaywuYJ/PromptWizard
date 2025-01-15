@@ -4,21 +4,46 @@ import os
 import logging
 import signal
 import sys
+import google.generativeai as genai
 
-# Configure logging
+# Configure detailed logging
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('prompt_optimization.log')
+    ]
 )
 logger = logging.getLogger(__name__)
 
-# Suppress noisy logs
+# Suppress noisy logs but keep errors
 logging.getLogger('absl').setLevel(logging.ERROR)
 logging.getLogger('grpc').setLevel(logging.ERROR)
 
 # Set environment variables for Gemini
 os.environ["MODEL_TYPE"] = "Gemini"
-os.environ["GOOGLE_API_KEY"] = "your_api_key_here"  # Replace with your actual API key
+
+# Check for API key
+api_key = os.environ.get("GOOGLE_API_KEY")
+if not api_key:
+    raise ValueError(
+        "GOOGLE_API_KEY environment variable not set. Please set it before running:\n"
+        "export GOOGLE_API_KEY=your_api_key_here"
+    )
+
+logger.info("Testing Gemini API connection...")
+try:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-pro')
+    response = model.generate_content("Hello, are you working?")
+    if response and hasattr(response, 'text'):
+        logger.info("Successfully connected to Gemini API")
+    else:
+        raise ValueError("Received invalid response from Gemini")
+except Exception as e:
+    logger.error(f"Failed to connect to Gemini API: {str(e)}")
+    raise
 
 # Configuration paths
 prompt_config_path = "configs/promptopt_config.yaml"
@@ -43,8 +68,9 @@ try:
     )
 
     logger.info("Starting prompt optimization...")
-    logger.info(f"Will perform {gp.prompt_opt_param.mutate_refine_iterations} iterations")
-    logger.info(f"Each iteration will generate {gp.prompt_opt_param.style_variation} variations")
+    logger.info("Configuration:")
+    logger.info(f"- Base instruction: {gp.prompt_opt_param.base_instruction}")
+    logger.info(f"- Task description: {gp.prompt_opt_param.task_description}")
     
     best_prompt, expert_profile = gp.get_best_prompt(
         use_examples=False,
@@ -52,19 +78,22 @@ try:
         generate_synthetic_examples=False
     )
     
-    if best_prompt and expert_profile:
-        logger.info("\nOptimization completed successfully!")
+    if best_prompt or expert_profile:
+        logger.info("\nOptimization completed!")
         logger.info("-" * 80)
-        logger.info("Expert Profile:")
-        logger.info(expert_profile)
-        logger.info("\nBest Prompt:")
-        logger.info(best_prompt)
+        if expert_profile:
+            logger.info("Expert Profile:")
+            logger.info(expert_profile)
+        if best_prompt:
+            logger.info("\nBest Prompt:")
+            logger.info(best_prompt)
         logger.info("-" * 80)
     else:
         logger.warning("No prompt or expert profile generated")
     
 except Exception as e:
     logger.error(f"\nTest failed with error: {str(e)}")
+    logger.error("Stack trace:", exc_info=True)
     raise e
 finally:
     logger.info("Test completed") 

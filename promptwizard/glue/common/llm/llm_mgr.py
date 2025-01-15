@@ -2,7 +2,7 @@ from typing import Dict, List
 from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
 from llama_index.core.llms import ChatMessage
 from llama_index.core.llms import LLM
-from tenacity import retry, stop_after_attempt, wait_fixed, wait_random, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_fixed, wait_random, wait_exponential, retry_if_exception_type
 from ..base_classes import LLMConfig
 from ..constants.str_literals import InstallLibs, OAILiterals, \
     OAILiterals, LLMLiterals, LLMOutputTypes
@@ -15,6 +15,7 @@ import os
 import google.generativeai as genai
 import atexit
 import signal
+import time
 logger = get_glue_logger(__name__)
 
 def call_api(messages):
@@ -89,13 +90,19 @@ class LLMMgr:
         """Initialize LLM configurations"""
         cls._config = config
         if os.environ.get("MODEL_TYPE") == "Gemini":
-            genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
-            cls._model = genai.GenerativeModel('gemini-pro')
-            # Register cleanup handler
-            atexit.register(cls._cleanup)
-            signal.signal(signal.SIGINT, cls._signal_handler)
+            try:
+                api_key = os.environ.get("GOOGLE_API_KEY")
+                if not api_key:
+                    raise ValueError("GOOGLE_API_KEY environment variable not set")
+                    
+                genai.configure(api_key=api_key)
+                cls._model = genai.GenerativeModel('gemini-pro')
+                logger.info("Successfully initialized Gemini configuration")
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini: {str(e)}")
+                raise
+                
         cls._initialized = True
-        logger.info("LLMMgr initialized with config")
 
     @classmethod
     def _cleanup(cls):
@@ -111,69 +118,70 @@ class LLMMgr:
         signal.default_int_handler(signum, frame)
 
     @staticmethod
-    @retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=stop_after_attempt(3))
+    @retry(
+        wait=wait_exponential(multiplier=1, min=2, max=60), stop=stop_after_attempt(3))  # Exponential backoff: 2s, 4s, 8s...)
+    
     def chat_completion(messages: Dict):
-        """
-        Handle chat completion requests with retry logic for rate limits.
-        """
+        """Handle chat completion requests with retry logic for rate limits."""
+        llm_handle = os.environ.get("MODEL_TYPE", "AzureOpenAI")
+        logger.debug(f"Using LLM: {llm_handle}")
+        
         try:
-            if not LLMMgr._initialized:
-                logger.warning("LLMMgr not initialized, initializing with default config")
-                LLMMgr.initialize({})
-
-            llm_handle = os.environ.get("MODEL_TYPE", "AzureOpenAI")
-            
-            if llm_handle == "AzureOpenAI":
-                return call_api(messages)
-            elif llm_handle == "Gemini":
+            if llm_handle == "Gemini":
+                # Add delay between requests
+                time.sleep(1)  # 1 second delay between requests
+                
                 try:
-                    model = LLMMgr._model or genai.GenerativeModel('gemini-pro')
-                    
-                    # Combine all system messages
-                    system_messages = "\n".join(
-                        msg["content"] for msg in messages 
-                        if msg["role"] == "system"
-                    )
-                    
-                    # Get the last user message
-                    user_messages = [
-                        msg["content"] for msg in messages 
-                        if msg["role"] == "user"
-                    ]
-                    
-                    if not user_messages:
-                        logger.warning("No user messages found")
-                        return ""
-
-                    # Combine system context with last user message
-                    final_prompt = (
-                        f"{system_messages}\n\n{user_messages[-1]}" 
-                        if system_messages else user_messages[-1]
-                    )
-                    
-                    logger.debug(f"Sending prompt to Gemini: {final_prompt[:100]}...")
-                    response = model.generate_content(final_prompt)
-                    
-                    if response and hasattr(response, 'text'):
-                        logger.debug(f"Received response from Gemini: {response.text[:100]}...")
-                        return str(response.text)
+                    # Configure Gemini
+                    api_key = os.environ.get("GOOGLE_API_KEY")
+                    if not api_key:
+                        raise ValueError("GOOGLE_API_KEY not set")
                         
-                    logger.warning("Empty response from Gemini")
-                    return ""
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel('gemini-pro')
                     
+                    # Convert messages to Gemini format
+                    chat = model.start_chat()
+                    system_message = ""
+                    user_message = ""
+                    
+                    # Process messages in order
+                    for msg in messages:
+                        logger.debug(f"Processing message: {msg['role']}")
+                        if msg["role"] == "system":
+                            system_message += msg["content"] + "\n"
+                        elif msg["role"] == "user":
+                            user_message = msg["content"]
+                    
+                    # Combine system and user messages
+                    final_prompt = f"{system_message}\n{user_message}" if system_message else user_message
+                    logger.debug(f"Sending prompt to Gemini: {final_prompt[:200]}...")
+                    
+                    try:
+                        response = model.generate_content(final_prompt)
+                        if response and hasattr(response, 'text'):
+                            logger.debug(f"Received response from Gemini: {response.text[:200]}...")
+                            return response.text
+                        else:
+                            logger.warning("Empty or invalid response from Gemini")
+                            return ""
+                    except Exception as api_error:
+                        logger.error(f"Gemini API error: {str(api_error)}")
+                        raise
+                        
                 except Exception as e:
                     logger.error(f"Error in Gemini chat: {str(e)}")
-                    raise  # Let retry handle it
-            
-            elif llm_handle == "LLamaAML":
-                return 0
+                    raise
+                    
+            elif llm_handle == "AzureOpenAI":
+                return call_api(messages)
             else:
                 raise ValueError(f"Unsupported model type: {llm_handle}")
                 
         except Exception as e:
             logger.error(f"Error in chat completion: {str(e)}")
             logger.error(f"Messages that caused error: {messages}")
-            return ""
+            raise
 
     @staticmethod
     def get_all_model_ids_of_type(llm_config: LLMConfig, llm_output_type: str):

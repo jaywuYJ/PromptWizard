@@ -69,54 +69,86 @@ class CritiqueNRefine(PromptOptimizer, UniversalBaseClass):
         self.iolog.reset_eval_glue(base_path)
 
     @iolog.log_io_params
-    def chat_completion(self, user_prompt: str, system_prompt: str = None):
-        """
-        Make a chat completion request to the OpenAI API.
-
-        :param user_prompt: Text spoken by user in a conversation.
-        :param system_prompt: Text spoken by system in a conversation.
-        :return: Output of LLM
-        """
-        if not system_prompt:
-            system_prompt = self.prompt_pool.system_prompt
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-        response = LLMMgr.chat_completion(messages)
-        return response
+    def chat_completion(self, user_prompt: str, system_prompt: str = None) -> str:
+        """Wrapper for LLM chat completion with error handling"""
+        try:
+            if not system_prompt:
+                system_prompt = self.prompt_pool.system_prompt
+            
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+            
+            response = LLMMgr.chat_completion(messages)
+            
+            # Ensure response is a string
+            if response is None:
+                self.logger.warning("Received None response from LLM")
+                return ""
+            
+            response_str = str(response).strip()
+            if not response_str:
+                self.logger.warning("Received empty response from LLM")
+                return ""
+            
+            return response_str
+            
+        except Exception as e:
+            self.logger.error(f"Error in chat completion: {str(e)}")
+            return ""
 
     @iolog.log_io_params
     def gen_different_styles(self, base_instruction: str, task_description: str,
                              mutation_rounds: int = 2, thinking_styles_count: int = 10) -> List:
-        """
-        Generate different variations of base_instruction by mixing thinking styles.
+        """Generate different variations of base_instruction by mixing thinking styles."""
+        candidate_prompts = [base_instruction]  # Start with base instruction as fallback
+        
+        try:
+            # Create mutation prompt with proper template
+            mutated_sample_prompt = f"""
+Please help me generate {thinking_styles_count} different variations of the following instruction:
 
-        :param base_instruction: Instruction given to LLM to solve the task defined in task_description.
-        :param task_description: Description of the task to be solved.
-        :param mutation_rounds: Number of rounds of mutation to be performed when generating different styles.
-        :param thinking_styles_count: Number of different thinking styles descriptions to be taken from the pool of
-                                      thinking styles and given to LLM as reference (in context).
+Task Description: {task_description}
+Base Instruction: {base_instruction}
 
-        :return: List of prompts generated in `mutation_rounds` rounds of mutation.
-        """
-        candidate_prompts = [task_description + "\n" + base_instruction]
+For each variation:
+1. Start with <START>
+2. Write the instruction variation
+3. End with <END>
 
-        for mutation_round in range(mutation_rounds):
-            mutated_sample_prompt = self.prompt_pool.meta_sample_template.format(
-                task_description=task_description,
-                meta_prompts="\n".join(self.prompt_pool.thinking_styles[:thinking_styles_count]),
-                num_variations=thinking_styles_count,
-                prompt_instruction=base_instruction)
+Please ensure each variation maintains the core intent but uses different phrasing and approaches.
+"""
+            
+            # Get mutated prompt from LLM
             generated_mutated_prompt = self.chat_completion(mutated_sample_prompt)
-            # Find all matches of the pattern in the text
-            matches = re.findall(DatasetSpecificProcessing.TEXT_DELIMITER_PATTERN_MUTATION, generated_mutated_prompt)
-            candidate_prompts.extend(matches)
-
-            self.logger.info(f"mutation_round={mutation_round} mutated_sample_prompt={mutated_sample_prompt}"
-                             f"mutated_prompt_generation={generated_mutated_prompt}")
-
+            
+            # Debug log the response
+            self.logger.debug(f"LLM Response: {generated_mutated_prompt}")
+            
+            if not generated_mutated_prompt or not isinstance(generated_mutated_prompt, str):
+                self.logger.warning("Invalid response from LLM")
+                return candidate_prompts
+                
+            # Extract prompts using regex pattern
+            pattern = r"<START>(.*?)<END>"
+            matches = re.findall(pattern, generated_mutated_prompt, re.DOTALL)  # re.DOTALL to match newlines
+            
+            if matches:
+                # Clean up the matches
+                cleaned_matches = [match.strip() for match in matches if match.strip()]
+                candidate_prompts.extend(cleaned_matches)
+                self.logger.info(f"Generated {len(cleaned_matches)} variations")
+            else:
+                self.logger.warning("No variations found in LLM response")
+                # If no matches found but we have a response, add it as a candidate
+                if generated_mutated_prompt.strip():
+                    candidate_prompts.append(generated_mutated_prompt.strip())
+                    
+        except Exception as e:
+            self.logger.error(f"Error in generating variations: {str(e)}")
+            self.logger.error(f"Using base instruction: {base_instruction}")
+        
         return candidate_prompts
 
     @iolog.log_io_params
