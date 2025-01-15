@@ -11,26 +11,26 @@ mode:
       llm_request_type: rag-query
       prompt_template: |
         {user_msg}
-      emb_model_id: text embedding ada 002 [vellm-openai2]
-      llm_model_id: gpt 35 Turbo [vellm-openai2]
-      prepend_system_prompts: False
-      prepend_system_guidelines: False
+      emb_model_id: gemini-embedding-001
+      llm_model_id: gemini-2.0-flash-exp
+      prepend_system_prompts: True
+      prepend_system_guidelines: True
 
     - name: CHAT-NEXT-MESSAGES
       llm_request_type: rag-query
       prompt_template: |
         {user_msg}
-      emb_model_id: text embedding ada 002 [vellm-openai2]
-      llm_model_id: gpt 35 Turbo [vellm-openai2]
-      prepend_system_prompts: False
-      prepend_system_guidelines: False
+      emb_model_id: gemini-embedding-001
+      llm_model_id: gemini-2.0-flash-exp
+      prepend_system_prompts: True
+      prepend_system_guidelines: True
 
   generation:
     - name: FLASH_PROFILE
       prompt_template: |
         {user_msg}
-      prepend_system_prompts: False
-      prepend_system_guidelines: False
+      prepend_system_prompts: True
+      prepend_system_guidelines: True
       llm_request_type: rag-query
-      emb_model_id: text embedding ada 002 [vellm-openai2]
-      llm_model_id: gpt 35 Turbo [vellm-openai2]
+      emb_model_id: gemini-embedding-001
+      llm_model_id: gemini-2.0-flash-exp

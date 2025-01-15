@@ -33,6 +33,7 @@ class GluePromptOpt:
     def __init__(self,
                  prompt_config_path: str,
                  setup_config_path: str,
+                 llm_config_path: str,
                  dataset_jsonl: str,
                  data_processor: DatasetSpecificProcessing,
                  dataset_processor_pkl_path: str = None,
@@ -102,6 +103,10 @@ class GluePromptOpt:
 
         # This iolog is going to be used when doing complete evaluation over test-dataset
         self.iolog.reset_eval_glue(join(base_path, "evaluation"))
+
+        # Load LLM config and initialize LLMMgr
+        llm_config = yaml_to_dict(llm_config_path)
+        LLMMgr.initialize(llm_config)
 
         self.prompt_opt = prompt_opt_cls(training_dataset, base_path, self.setup_config,
                                          self.prompt_pool, self.data_processor, self.logger)

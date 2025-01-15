@@ -33,7 +33,8 @@ INSTALL_REQUIRES = [
     "pyarrow==15.0.2",
     "llama-index==0.11.10",
     "llama-index-core==0.11.10",
-    "python-dotenv"
+    "python-dotenv",
+    "google-generativeai"
 ]
 QUANLITY_REQUIRES = [
     "black==21.4b0",

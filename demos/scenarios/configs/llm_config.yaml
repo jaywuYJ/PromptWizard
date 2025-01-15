@@ -1,0 +1,20 @@
+# Add this section
+gemini:
+  # Chat model config
+  unique_model_id: "gemini-2.0-flash-exp"
+  model_name: "gemini-2.0-flash-exp"
+  model_type: "chat"
+  track_tokens: true
+  req_per_min: 60
+  tokens_per_min: 60000
+  error_backoff_in_seconds: 60
+
+  # Embedding model config
+  embedding_model:
+    unique_model_id: "gemini-embedding-001"
+    model_name: "embedding-001"
+    model_type: "embeddings"
+    track_tokens: true
+    req_per_min: 100
+    tokens_per_min: 100000
+    error_backoff_in_seconds: 30 

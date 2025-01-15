@@ -1,0 +1,30 @@
+# LLM Configuration for testing
+azure_open_ai:
+  api_key: ""
+  api_version: ""
+  api_type: "azure"
+  azure_endpoint: ""
+  azure_oai_models: []
+
+# Gemini configuration
+gemini:
+  unique_model_id: "gemini-2.0-flash-exp"
+  model_name: "gemini-2.0-flash-exp"
+  model_type: "chat"
+  track_tokens: true
+  req_per_min: 60
+  tokens_per_min: 60000
+  error_backoff_in_seconds: 60
+
+# User limits
+user_limits:
+  max_num_requests_in_time_window: 100
+  time_window_length_in_seconds: 60
+
+# Scheduler limits
+scheduler_limits:
+  ttl_in_seconds: 300
+  max_queue_size: 100
+
+# Custom models (empty for now)
+custom_models: [] 
