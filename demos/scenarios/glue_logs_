@@ -10,19 +10,19 @@ Prompt Optimization parameters: [('answer_format', 'For each question present th
 ======================================================================================================================================================
  + Starting iteration: 1 
  current_base_instruction: Lets think step by step.
+LLM Response: **Variation 1:**
+<START>
+Consider the problem from various angles and devise a step-by-step approach to solving it.
+<END>
 
-======================================================================================================================================================
- + Starting iteration: 1 
- current_base_instruction: Lets think step by step.
+**Variation 2:**
+<START>
+Let's break down the problem into smaller, manageable steps. We'll tackle it one step at a time.
+<END>
 
-======================================================================================================================================================
- + Starting iteration: 1 
- current_base_instruction: Lets think step by step.
-
-======================================================================================================================================================
- + Starting iteration: 1 
- current_base_instruction: Lets think step by step.
-
-======================================================================================================================================================
- + Starting iteration: 1 
- current_base_instruction: Lets think step by step.
+**Variation 3:**
+<START>
+Apply a systematic approach to solving the problem. Let's analyze the given information, identify patterns, and work towards a solution through logical reasoning.
+<END>
+Generated 3 variations
+Time taken to find best prompt: 51.36672925949097 sec

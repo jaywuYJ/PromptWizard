@@ -942,3 +942,4 @@ venv_py39/share/jupyter/nbextensions/jupyter-js-widgets/extension.js
 venv_py39/share/jupyter/nbextensions/jupyter-js-widgets/extension.js.LICENSE.txt
 venv_py39/share/jupyter/nbextensions/jupyter-js-widgets/extension.js.map
 venv_py39/share/man/man1/ipython.1
+demos/scenarios/glue_logs_
